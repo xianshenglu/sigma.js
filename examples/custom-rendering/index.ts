@@ -1,3 +1,6 @@
+import { ParseResult } from "papaparse";
+import Papa from "papaparse";
+
 /**
  * This example shows how to use different programs to render nodes.
  * This works in two steps:
@@ -38,40 +41,56 @@ const RED = "#FA4F40";
 const BLUE = "#727EE0";
 const GREEN = "#5DB346";
 
-graph.addNode("John", { size: 15, label: "John", type: "image", image: "./user.svg", color: RED });
-graph.addNode("Mary", { size: 15, label: "Mary", type: "image", image: "./user.svg", color: RED });
-graph.addNode("Suzan", { size: 15, label: "Suzan", type: "image", image: "./user.svg", color: RED });
-graph.addNode("Nantes", { size: 15, label: "Nantes", type: "image", image: "./city.svg", color: BLUE });
-graph.addNode("New-York", { size: 15, label: "New-York", type: "image", image: "./city.svg", color: BLUE });
-graph.addNode("Sushis", { size: 7, label: "Sushis", type: "border", color: GREEN });
-graph.addNode("Falafels", { size: 7, label: "Falafels", type: "border", color: GREEN });
-graph.addNode("Kouign Amann", { size: 7, label: "Kouign Amann", type: "border", color: GREEN });
+const CITY_NODE_CONF = { size: 15, label: "New-York", type: "border", image: "./city.svg", color: BLUE };
 
-graph.addEdge("John", "Mary", { type: "line", label: "works with", size: 5 });
-graph.addEdge("Mary", "Suzan", { type: "line", label: "works with", size: 5 });
-graph.addEdge("Mary", "Nantes", { type: "arrow", label: "lives in", size: 5 });
-graph.addEdge("John", "New-York", { type: "arrow", label: "lives in", size: 5 });
-graph.addEdge("Suzan", "New-York", { type: "arrow", label: "lives in", size: 5 });
-graph.addEdge("John", "Falafels", { type: "arrow", label: "eats", size: 5 });
-graph.addEdge("Mary", "Sushis", { type: "arrow", label: "eats", size: 5 });
-graph.addEdge("Suzan", "Kouign Amann", { type: "arrow", label: "eats", size: 5 });
-
-graph.nodes().forEach((node, i) => {
-  const angle = (i * 2 * Math.PI) / graph.order;
-  graph.setNodeAttribute(node, "x", 100 * Math.cos(angle));
-  graph.setNodeAttribute(node, "y", 100 * Math.sin(angle));
+Papa.parse("./IA_nodes.csv", {
+  download: true,
+  header: true,
+  delimiter: ",",
+  complete: onNodesParseComplete,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const renderer = new Sigma(graph, container, {
-  // We don't have to declare edgeProgramClasses here, because we only use the default ones ("line" and "arrow")
-  nodeProgramClasses: {
-    image: getNodeProgramImage(),
-    border: NodeProgramBorder,
-  },
-  renderEdgeLabels: true,
-});
+function onNodesParseComplete(results: ParseResult<{ Id: string; Name: string }>) {
+  const nodes = results.data;
+  nodes.forEach((node) => {
+    graph.addNode(node.Id, { ...CITY_NODE_CONF, label: node.Name });
+  });
+  Papa.parse("./IA_edges.csv", {
+    download: true,
+    header: true,
+    delimiter: ",",
+    complete: onEdgesComplete,
+  });
+}
 
-// Create the spring layout and start it
-const layout = new ForceSupervisor(graph);
-layout.start();
+function onEdgesComplete(results: ParseResult<{ Type: string; Source: number; Target: number }>) {
+  const edges = results.data;
+
+  edges.forEach((edge) => {
+    const type = edge.Type.trim() === "directed" ? "arrow" : "line";
+    graph.addEdge(edge.Source, edge.Target, { type, size: 5 });
+  });
+  main();
+}
+
+function main() {
+  graph.nodes().forEach((node, i) => {
+    const angle = (i * 2 * Math.PI) / graph.order;
+    graph.setNodeAttribute(node, "x", 100 * Math.cos(angle));
+    graph.setNodeAttribute(node, "y", 100 * Math.sin(angle));
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const renderer = new Sigma(graph, container, {
+    // We don't have to declare edgeProgramClasses here, because we only use the default ones ("line" and "arrow")
+    nodeProgramClasses: {
+      image: getNodeProgramImage(),
+      border: NodeProgramBorder,
+    },
+    renderEdgeLabels: true,
+  });
+
+  // Create the spring layout and start it
+  const layout = new ForceSupervisor(graph);
+  layout.start();
+}
